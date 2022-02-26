@@ -1,9 +1,37 @@
 from rich import print
+from rich.console import Console
 from rich.prompt import Prompt
 from rich.table import Table
 
 from champlistloader import load_some_champs
 from core import Champion, Match, Shape, Team
+
+from socket import AF_INET, SO_REUSEADDR, SOCK_STREAM, gethostname, socket
+from ssl import SOL_SOCKET
+
+from constants import B_DONE, B_INPUT, B_MESSAGE
+
+def send_to_player(num, message):
+    psockets[num].send(B_MESSAGE + message.encode() + B_DONE)
+
+def send_to_all(message):
+    for sock in psockets:
+        sock.send(B_MESSAGE + message.encode() + B_DONE)
+
+def request_input(num, message):
+    psockets[num].send(B_INPUT + message.encode() + B_DONE)
+    return recieve_from(num)
+
+def recieve_from(num):
+    while True:
+        data = psockets[num].recv(1024)
+        if data:
+            return data.decode()
+
+
+def enough_players():
+    return len(psockets) == 2
+
 
 
 def print_available_champs(champions: dict[Champion]) -> None:
@@ -21,28 +49,36 @@ def print_available_champs(champions: dict[Champion]) -> None:
     # Populate the table
     for champion in champions.values():
         available_champs.add_row(*champion.str_tuple)
+    
 
-    print(available_champs)
+    console = Console(force_terminal=False)
+    with console.capture() as capture:
+        console.print(available_champs)
+
+    send_to_all(capture.get())
+    print(capture.get())
 
 
-def input_champion(prompt: str,
-                   color: str,
-                   champions: dict[Champion],
-                   player1: list[str],
-                   player2: list[str]) -> None:
+def input_champion(playerId: int,
+                    prompt: str,
+                    color: str,
+                    champions: dict[Champion],
+                    player1: list[str],
+                    player2: list[str]) -> None:
 
     # Prompt the player to choose a champion and provide the reason why
     # certain champion cannot be selected
     while True:
-        match Prompt.ask(f'[{color}]{prompt}'):
+        match request_input(playerId, f'[{color}]{prompt}'):
             case name if name not in champions:
-                print(f'The champion {name} is not available. Try again.')
+                send_to_player(playerId, f'The champion {name} is not available. Try again.')
             case name if name in player1:
-                print(f'{name} is already in your team. Try again.')
+                send_to_player(playerId, f'{name} is already in your team. Try again.')
             case name if name in player2:
-                print(f'{name} is in the enemy team. Try again.')
+                send_to_player(playerId, f'{name} is in the enemy team. Try again.')
             case _:
                 player1.append(name)
+                send_to_all(f"Player {playerId + 1} chose {name}!")
                 break
 
 
@@ -73,26 +109,31 @@ def print_match_summary(match: Match) -> None:
             red, blue = key.split(', ')
             round_summary.add_row(f'{red} {EMOJI[round[key].red]}',
                                   f'{blue} {EMOJI[round[key].blue]}')
-        print(round_summary)
-        print('\n')
+
+
+        console = Console(force_terminal=False)
+        with console.capture() as capture:
+            console.print(round_summary)
+        send_to_all(capture.get())
+
 
     # Print the score
     red_score, blue_score = match.score
-    print(f'Red: {red_score}\n'
+    send_to_all(f'Red: {red_score}\n'
           f'Blue: {blue_score}')
 
     # Print the winner
     if red_score > blue_score:
-        print('\n[red]Red victory! :grin:')
+        send_to_all('\n[red]Red victory! :grin:')
     elif red_score < blue_score:
-        print('\n[blue]Blue victory! :grin:')
+        send_to_all('\n[blue]Blue victory! :grin:')
     else:
-        print('\nDraw :expressionless:')
+        send_to_all('\nDraw :expressionless:')
 
 
-def main() -> None:
+def start_game() -> None:
 
-    print('\n'
+    send_to_all('\n'
           'Welcome to [bold yellow]Team Local Tactics[/bold yellow]!'
           '\n'
           'Each player choose a champion each time.'
@@ -107,8 +148,8 @@ def main() -> None:
 
     # Champion selection
     for _ in range(2):
-        input_champion('Player 1', 'red', champions, player1, player2)
-        input_champion('Player 2', 'blue', champions, player2, player1)
+        input_champion(0, 'Player 1', 'red', champions, player1, player2)
+        input_champion(1, 'Player 2', 'blue', champions, player2, player1)
 
     print('\n')
 
@@ -122,6 +163,26 @@ def main() -> None:
     # Print a summary
     print_match_summary(match)
 
+psockets = []
+
+
+sock = socket(AF_INET, SOCK_STREAM)
+sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+
+sock.bind(('localhost', 1200))
+
 
 if __name__ == '__main__':
-    main()
+    sock.listen()
+
+    while True:
+        (cs, ip) = sock.accept()
+        psockets.append(cs)
+        print(f"Player {len(psockets)} connected")
+
+        cs.send(B_MESSAGE + f"Connected as player {len(psockets)}".encode() + B_DONE)
+
+        if enough_players():
+            start_game()
+            sock.close()
+            break
