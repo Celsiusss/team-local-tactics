@@ -24,12 +24,14 @@ while True:
             doPrint = True
         if b == B_DONE:
             doPrint = False
+            print(message.decode())
+            message = bytes()
         if b == B_INPUT:
             needInput = True
         if doPrint:
             message += b
     
-    print(message.decode())
+    
     if needInput:
         send_input('kys')
 
