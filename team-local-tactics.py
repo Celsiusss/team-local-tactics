@@ -1,3 +1,4 @@
+import uuid
 from rich import print
 from rich.console import Console
 from rich.prompt import Prompt
@@ -10,6 +11,9 @@ from socket import AF_INET, SO_REUSEADDR, SOCK_STREAM, gethostname, socket
 from ssl import SOL_SOCKET
 
 from constants import B_DONE, B_INPUT, B_MESSAGE
+
+import sqlite3
+from sqlite3 import Error
 
 def send_to_player(num, message):
     psockets[num].send(B_MESSAGE + message.encode() + B_DONE)
@@ -31,6 +35,28 @@ def recieve_from(num):
 
 def enough_players():
     return len(psockets) == 2
+
+def storeMatch(match: Match):
+    con = None
+    try:
+        con = sqlite3.connect("storage.db")
+    except Error as e:
+        print("Couldn't connect to database")
+
+
+    
+    red_score, blue_score = match.score
+
+    sql = f"""
+    INSERT INTO matches (redScore, blueScore, Rc1, Rc2, Bc1, Bc2) 
+    VALUES ({red_score}, {blue_score}, '{match.red_team.champions[0].name}', '{match.red_team.champions[1].name}', '{match.blue_team.champions[0].name}', '{match.blue_team.champions[1].name}');"""
+
+    try:
+        c = con.cursor()
+        c.execute(sql)
+        con.commit()
+    except Error as e:
+        print(e)
 
 
 
@@ -130,6 +156,8 @@ def print_match_summary(match: Match) -> None:
     else:
         send_to_all('\nDraw :expressionless:')
 
+    storeMatch(match)
+
 
 def start_game() -> None:
 
@@ -163,7 +191,13 @@ def start_game() -> None:
     # Print a summary
     print_match_summary(match)
 
+
+
+
+
+
 psockets = []
+
 
 
 sock = socket(AF_INET, SOCK_STREAM)
@@ -174,6 +208,7 @@ sock.bind(('localhost', 1200))
 
 if __name__ == '__main__':
     sock.listen()
+    
 
     while True:
         (cs, ip) = sock.accept()
@@ -181,6 +216,7 @@ if __name__ == '__main__':
         print(f"Player {len(psockets)} connected")
 
         cs.send(B_MESSAGE + f"Connected as player {len(psockets)}".encode() + B_DONE)
+
 
         if enough_players():
             start_game()

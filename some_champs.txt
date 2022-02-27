@@ -7,3 +7,4 @@ Katina,20,50,30
 Asir,5,5,90
 Cactus,5,90,5
 Luanne,90,5,5
+Kaisa,0,0,100
