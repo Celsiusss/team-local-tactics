@@ -192,6 +192,40 @@ def start_game() -> None:
     print_match_summary(match)
 
 
+def showHistory():
+    con = None
+    try:
+        con = sqlite3.connect("storage.db")
+    except Error as e:
+        print("Couldn't connect to database")
+
+    sql = """SELECT * FROM matches;"""
+    try:
+        c = con.cursor()
+        c.execute(sql)
+        con.commit()
+    except Error as e:
+        print(e)
+
+    results = c.fetchall()
+
+    matchHistory = Table(title="Match History")
+
+    matchHistory.add_column("Match Id", style="cyan")
+    matchHistory.add_column("Red Score", style="red")
+    matchHistory.add_column("Blue Score", style="blue")
+    matchHistory.add_column("Red champs", style="red")
+    matchHistory.add_column("Blue champs", style="blue")
+    
+
+
+    for row in results:
+        matchHistory.add_row(str(row[0]), str(row[1]), str(row[2]), f"{row[3]}, {row[4]}", f"{row[5]}, {row[6]}")
+
+    console = Console(force_terminal=False)
+    with console.capture() as capture:
+        console.print(matchHistory)
+    return capture.get()
 
 
 
@@ -216,7 +250,7 @@ if __name__ == '__main__':
         print(f"Player {len(psockets)} connected")
 
         cs.send(B_MESSAGE + f"Connected as player {len(psockets)}".encode() + B_DONE)
-
+        cs.send(B_MESSAGE + showHistory().encode() + B_DONE)
 
         if enough_players():
             start_game()
