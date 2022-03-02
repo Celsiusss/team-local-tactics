@@ -1,3 +1,6 @@
 B_MESSAGE = b'\x01'
 B_DONE = b'\x00'
 B_INPUT = b'\x02'
+DB_INSERTMATCH = b'\x03'
+DB_GETCHAMPS = b'\x04'
+DB_GETMATCH = b'\x05'
