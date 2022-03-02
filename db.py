@@ -91,7 +91,7 @@ if __name__ == '__main__':
                 c.execute(sqlRow)
                 con.commit()
             except Error as e:
-                print(e)
+                print("Champion already in Database")
 
 
 
