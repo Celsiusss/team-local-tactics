@@ -17,15 +17,15 @@ sock = socket(AF_INET, SOCK_STREAM)
 
 sock.connect(('localhost', 1200))
 
+message = bytes()
+do_print = False
+need_input = False
+
 while True:
-    data = sock.recv(1024)
+    data = sock.recv(100)
     if not data:
         break
 
-    do_print = False
-    need_input = False
-
-    message = bytes()
     for b in [data[i:i+1] for i in range(len(data))]:
         if b == B_MESSAGE:
             do_print = True
